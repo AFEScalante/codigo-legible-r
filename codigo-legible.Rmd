@@ -1,0 +1,258 @@
+---
+title: "Código legible con R"
+description: |
+  Técnicas simples y prácticas para escribir mejor código.
+author:
+  - name: Angel Escalante 
+date: "`r Sys.Date()`"
+output:
+   distill::distill_article:
+     toc: TRUE
+     toc_depth: 3
+     pandoc_args: ["--variable", "lang=en"]
+toc-title: "Contenido"
+lang: es
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE, fig.align = "center", 
+                      list(width = 90))
+library(emo)
+library(magrittr)
+library(dplyr)
+```
+
+
+Este documento está basado en el libro **The Art of Readable Code** de Dustin Boswell y Trevor Foucher (2012). Ambos desarrolladores, con amplia experiencia trabajando para distintas empresas de software exitosas (Google entre ellas), proponen una serie de técnicas y consejos que, con base a su experiencia, les ha servido para escribir *mejor código*.
+
+La intención del presente documento es la de sintetizar y presentar estas técnicas adecuadas a código en `r fontawesome::fa("r-project", fill="black")`  junto con consejos basados en experiencias personales como desarrollador en este lenguaje.
+
+El documento se divide en 3 partes principales:
+
+* **Mejoras superficiales**: Buenas practicas para nombrar y comentar código.
+* **Simplificar lógica y loops**: Formas de refinar loops, lógica y variables en tu código para hacerlo fácil de entender.
+* **Reorganizar código**: Organizar grandes bloques de código y atacar problemas nivel función.
+
+# Introducción
+
+El objetivo del documento es ayudarte a hacer tu código mejor. No la arquitectura de tu proyecto o el diseño del paquete o script. Si bien son cosas importantes, en el día a día invertimos más tiempo en cosas "básicas" como nombrar una variable, escribir loops y crear funciones. Y una gran parte de esto implica es leer y editar el código que ya está ahí.
+
+### El Teorema fundamental de la legibilidad
+
+Antes que nada, hay que definir a que nos referimos con **mejor código**. La idea principal de los autores (y de todo el documento) es que *el código debe ser fácil de entender*.  Básicamente, seguir el **teorema fundamental de la legibilidad**, el cuál dice:
+
+**El código debe ser escrito para minimizar el tiempo que le tomaría a alguien más entenderlo** `r emo::ji("inventor")`
+
+Con esto en mente, consideraremos mejor código al código *más legible*.
+
+Si llegado a este punto te has preguntado: **¿Por qué mi código tiene que ser más legible si yo soy el único que lo lee?** La respuesta es sencilla, tu yo del futuro del futuro necesitará entender lo que tu yo del pasado estaba pensando cuando escribió ese código.
+
+<img src="img/spidey.jpeg" width=420 height=300></img>
+
+Quizá también pienses: ¿Y qué pasa con otras limitaciones, como hacer un código eficiente, o bien diseñado, o fácil de testear, etc.? ¿No entran a veces en conflicto con el deseo de que el código sea fácil de entender?
+
+En general, estos otros objetivos **no interfieren en absoluto**. Incluso en el ámbito del código altamente optimizado, hay formas de hacerlo también altamente legible. Y hacer que tu código sea fácil de entender a menudo conduce a un código que está bien diseñado y es fácil de testear.
+
+### La parte difícil
+
+Desde luego es difícil pensar constantemente como será la experiencia de alguien externo intentando leer tu código y que tan fácil será para esa persona entenderlo. Esto representará trabajo extra para ti, pero sin duda, ¡este será recompensado con menos bugs y serás un mejor programador!
+
+# Mejoras superficiales
+
+## Da información al nombrar
+
+### Nombres concisos
+
+Piensa en esto, los nombres de las variables (o funciones) son comentarios en sí. Un buen nombre de una variable puede, en ciertas situaciones, valer más que un comentario.
+
+Aquí un ejemplo
+
+```{r}
+getData <- function(url) {
+  ...
+}
+```
+
+La palabra **get** no es muy específica, ¿va a descargar datos de la url y almacenarla en algún lado? ¿obtendrá un `data.frame` que tendrá que ser asignado? ¿hará un `attach()` de los datos de la url para trabajar con ellos? Si el objetivo es descargar datos de una url específica, un mejor nombre para la función sería `downloadData()`.
+
+Otro ejemplo, imaginemos que hemos creado un modelo de regresión basado en árboles de decisión y creamos esta función:
+
+```{r}
+sizeTree <- function(tree_model) {
+  ...
+} 
+```
+
+¿Qué queremos obtener del árbol? ¿La altura, el número de nodos, el número de observaciones? size no da mucha información, un nombre más específico sería más útil, como 
+`heightTree()` o `numNodesTree()`.
+
+La clave está en elegir palabras precisas que dejen claro la intención de la función (o de la variable) sin dejar lugar a ambigüedades.
+
+Aquí hay algunos ejemplos de palabras "más informativas".
+
+| Palabras | Alternativa |
+| -------- | ----------- |
+|  send    | search, extract, distribute |
+|  find    | search, extract, locate, recover |
+|  start   | create, begin, open |
+|  make    | create, set-up, build, generate, add |
+
+### Evita nombres temporales
+
+Nombres como *temp*, *val*, y *x* usualmente significan cosas como "no pude pensar en otro nombre". En su lugar, escoge un nombre que describa el valor de la variable o su propósito.
+
+Por ejemplo, 
+
+```{r}
+norma_euclideana <- function(v) {
+  final <- 0
+  for(i in seq_along(v)) final <- final + v[i] ^ 2
+  return(sqrt(final))
+}
+```
+
+Aquí, la única información que aporta la variable *final*, es que su uso será para retornar un valor final dentro de un cálculo. 
+
+Si quisieramos un nombre más informativo, podría ser *suma_cuadrado*. El código quedaría
+`suma_cuadrado <- suma_cuadrado + v[i] ^ 2`. Esto anunciaría el propósito de la variable, y por tanto, facilitaría la detección de un bug.
+
+Pensemos en esta línea
+
+```{r eval=FALSE}
+final <- final + v[i]
+```
+
+esto es claramente un bug, ¿no es así?
+
+Quizá aquí sería más claro el bug:
+
+```{r eval=FALSE}
+suma_cuadrado <- suma_cuadrado + v[i]
+```
+
+¿Dónde está el cuadrado en `suma_cuadrado`? El nombre `final` no lleva consigo mucha información.
+
+### temp
+
+Considera un caso en el que necesitas intercambiar el valor de dos variables:
+
+```{r eval=FALSE}
+if (right < left) {
+  temp <- right
+  right <- left
+  left <- temp
+}
+```
+
+En este caso, el uso de `temp` es adecuado. El tiempo de vida de `temp` es de tan sólo unas líneas dentro del bloque `if()`. Sin embargo, hay casos en los que, a pesar de que el tiempo de vida de la variable `temp`, un nombre más descriptivo sería más útil.
+
+Veamos el siguiente ejemplo:
+
+```{r eval=FALSE}
+temp <- calcularPrecioUSD(casa_mts, casa_num_cuartos)
+valor_final <- temp * tasa_usd_a_pesos
+```
+
+Si bien, `temp` será usado inmediatamente una línea abajo, trae consigo información valiosa; el precio de una casa en dólares.
+
+Esto sería mucho mejor:
+
+```{r eval=FALSE}
+precio_casa_usd <- calcularPrecioUSD(casa_mts, casa_num_cuartos)
+precio_casa_pesos <- precio_casa_usd * tasa_usd_a_pesos
+```
+
+El nombre `temp` debe usarse sólo en los casos en que el hecho de ser efímera y temporal sea lo más importante de esa variable. Si contendrá información valiosa (como el precio de una casa `r emo::ji("smile")`) podemos tomar tiempo extra para pensar en un buen nombre, y así ejercitar nuestras habilidades para nombrar variables.
+
+### Iteradores en loops
+
+Nombres como `i`, `j` y `k` son comúnmente usados como índices e iteradores de bucles. Aunque estos nombres son genéricos, se entiende que significan "soy un iterador". Pero a veces hay mejores nombres de iteradores que `i`, `j` y `k`. Por ejemplo, los siguientes bucles encuentran qué usuarios, después de una noche loca `r emo::ji("beer")`, visitaron qué bares:
+
+```{r eval=FALSE}
+library(purrr)
+library(glue)
+# Lista de bares con número de usuarios
+bares <- map(1:10, ~sample(1:15, size = .x))
+usuarios <- 1:10
+
+for (i in seq_along(bares)) {
+  for (j in seq_along(bares[i])) {
+    for (k in usuarios) {
+      if (bares[[i]][k] == j) {
+        glue("El usuario {k} estuvo en el bar {i}")
+      }
+    }
+  }
+}
+```
+
+¿Pueden encontrar el bug aquí?
+La línea `if(bares[[i]][k] == j` tiene un uso incorrecto de `k` y `j`, están invertidos. Esto es, la condición tendría que ser `if(bares[[i]][j] == j)`. Usando nombres más precisos en los iteradores pudo haber ayudado a evitar este bug
+
+```{r eval=FALSE}
+for (bar in seq_along(bares)) {
+  for (asistentes in seq_along(bares[i])) {
+    for (usuario in usuarios) {
+      if (bares[[bar]][asistentes] == usuario) {
+        glue("El usuario {usuario} estuvo en el bar {bar}")
+      }
+    }
+  }
+}
+```
+
+Hay menos posibilidad de equivocarse, incluso es más claro lo que está pasando dentro de la función `glue()`, ¿no es así?
+
+### Usa nombres más largos para scopes más grandes
+
+#### ¿Qué tan largo debe ser un nombre?
+
+A la hora de elegir un buen nombre, hay una restricción implícita: el nombre no debe ser demasiado largo. A nadie le gusta trabajar con identificadores así:
+
+```{r eval=FALSE}
+coeficientesModeloRegresionRedElastica
+```
+
+Cuanto más largo sea un nombre, más difícil será de recordar y más espacio consumirá en la pantalla, lo que posiblemente requerirá líneas adicionales de código. Sin embargo, existe un trade-off. Usar un nombre corto simplemente por ahorrar espacio puede ser poco entendible.
+Esta decisión es un juicio cuya mejor respuesta depende de cómo se utilice exactamente esa variable. Pero he aquí algunos consejos que pueden ayudar decidir.
+
+Si sales viaje uno o dos días, seguramente llevarás menos equipaje que si viajas un mes entero. Del mismo modo, los identificadores que tienen un pequeño "alcance" (cuántas otras líneas de código pueden "ver" este nombre) no necesitan llevar tanta información.
+
+```{r eval=FALSE}
+tbl <- tibble(
+  a1 = rnorm(100, 5, 3),
+  a2 = rnorm(100, 5, 2),
+  a3 = rnorm(100, 8, 4)
+  b1 = rnorm(100),
+  b2 = rnorm(100)
+)
+
+acols <- grep("a", names(tbl))
+normaliza <- function(x) (x - mean(x)) / sd(x)
+tbl %<>%
+  mutate_at(acols, normaliza)
+```
+
+El único propósito de `acols` es el de almacenar la posición de las columnas del tibble `tbl` que llevan consigo la letra "a". Esto para después normalizarlas (restar por media y dividir por desviación estándar) dos líneas más abajo. Al igual que el nombre de la función `normaliza()`, `acols` tienen un uso inmediato, es decir, un scope pequeño.
+
+A manera de resumen, estos son los consejos sobre nombrar variables:
+
+* Evita nombres genéricos como val, temp, etc. A menos que haya una razón específica.
+* Usa nombres concretos.
+* Añade información importante a los nombres. Los nombres son un comentario en si mismos.
+* Nombres largos para grandes scopes.
+* Usa letras capitalez y guiones bajos de forma significativa.
+
+Antes de decidirse por un nombre, haz de "abogado del diablo" e imagina cómo podría malinterpretarse tu nombre. Los mejores nombres son resistentes a las malas interpretaciones.
+
+## Saber que comentar
+
+El propósito de comentar es hacer saber 
+
+
+
+
+
+
+
